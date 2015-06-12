@@ -1,0 +1,177 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+
+<div class="buttons">
+    <button class="btn sender">Sender</button>
+    <button class="btn recevier">Receiver</button>
+    
+
+</div>
+
+<div class="row data">
+
+</div>
+
+@section scripts
+{
+    <script src="~/Scripts/sense.js"></script>
+    <script src="~/Scripts/jquery.signalR-2.2.0.js"></script>
+    <script src="~/signalr/hubs"></script>
+    <script>
+        $(function() {
+            var _s = sense.init();
+            var mobileDemo = $.connection.mobileDemoHub;
+            var rotation = 0;
+
+            $(".recevier").click(function() {
+                $(".data").html(getServerNameHtml());
+
+                function getServerNameHtml() {
+                    var $container = $("<div/>");
+                    $container.append($("<input/>").addClass("server-name"));
+                    $container.append($("<button/>").addClass("btn").text("Create Server").click(function() {
+                        var name = $(".server-name").val();
+                        mobileDemo.server.createServer(name);
+                        $container.remove();
+
+                        var canvas = document.createElement("canvas");
+                        canvas.width = 1000;
+                        canvas.height = 1000;
+                        var ctx = canvas.getContext("2d");
+                        ctx.translate(500, 500);
+                        ctx.fillStyle = "#000";
+                        var $data = $(".data");
+                        $data.append($(canvas));
+
+                        var loop = function () {
+                            update();
+                            draw();
+                            window.requestAnimationFrame(loop, canvas);
+                        };
+                        window.requestAnimationFrame(loop, canvas);
+                        var objects = [];
+                        
+                        function Projectile(posX, posY, vel) {
+                            this.x = posX;
+                            this.y = posY;
+                            this.width = 30;
+                            this.velocity = vel;
+                        }
+
+                        Projectile.prototype.update = function() {
+                            
+                        }
+                        
+
+                        function update() {
+
+                        }
+
+                        function draw() {
+                            ctx.save();
+
+                            ctx.clearRect(-500, -500, 1000, 1000);
+                            ctx.rotate(-rotation * Math.PI / 180);
+                            ctx.fillStyle = "#007";
+                            ctx.fillRect(-25, 0, 50, 75);
+                            ctx.fillStyle = "#700";
+                            ctx.fillRect(-25, -75, 50, 75);
+                            
+                            
+                            ctx.restore();
+
+                        }
+                    }));
+                    return $container;
+                }
+
+                function orientationDataToHtml(data) {
+                    var $container = $("<div/>");
+                    rotation = data.rotation.alpha
+                    $container.append($("<div/>").text("alpha: " + data.rotation.alpha));
+                    $container.append($("<div/>").text("beta: " + data.rotation.beta));
+                    $container.append($("<div/>").text("gamma: " + data.rotation.gamma));
+                    return $container;
+                }
+
+                function accelerationDataToHtml(data) {
+                    var $container = $("<div/>");
+                    $container.append($("<div/>").text("x: " + data.acceleration.x));
+                    $container.append($("<div/>").text("y: " + data.acceleration.y));
+                    $container.append($("<div/>").text("z: " + data.acceleration.z));
+                    return $container;
+                }
+
+                mobileDemo.client.receiveConnection = function(id) {
+                    var $container = $("<div/>").addClass("connection").addClass(id);
+                    $container.append($("<div/>").addClass("connection-id").text(id));
+                    $container.append($("<div/>").addClass("sensor-data"));
+                    $container.append($("<div/>").addClass("acceleration-data"));
+                    $(".data").append($container);
+                }
+
+                mobileDemo.client.receiveRotationData = function(data) {
+                    $(".connection." + data.connectionId + " .sensor-data").html(orientationDataToHtml(data));
+
+                }
+
+                mobileDemo.client.receiveAccelerationData = function(data) {
+                    $(".connection." + data.connectionId + " .acceleration-data").html(accelerationDataToHtml(data));
+                }
+
+                $.connection.hub.start().then(function() {
+                    $(".buttons").remove();
+                    
+                });
+            });
+
+            function deviceMotionHandler(eventData, server) {
+                mobileDemo.server.sendAccelerationData({
+                    x: eventData.acceleration.x,
+                    y: eventData.acceleration.y,
+                    z: eventData.acceleration.z
+                }, server);
+            }
+
+            function setUpSendingMotion(server) {
+                if (window.DeviceMotionEvent) {
+                    window.addEventListener('devicemotion', function(eventData) {
+                        deviceMotionHandler(eventData, server);
+                    }, false);
+                } else {
+                    $(".acceleration-data").text("not supported");
+                }
+                _s.orientation(function(data) {
+                    mobileDemo.server.sendRotationData(data, server);
+                });
+
+
+            }
+
+
+            $(".sender").click(function () {
+                $.connection.hub.start().then(function () {
+                    $(".buttons").remove();
+                    mobileDemo.server.getServers().done(function(data) {
+                        var $data = $(".data");
+                        $data.empty();
+                        $(data).each(function(key, val) {
+                            $data.append($("<div/>").text(val).click(function() {
+                                var server = $(this).text();
+                                mobileDemo.server.connect(server);
+                                $data.empty();
+                                setUpSendingMotion(server);
+                            }));
+                        });
+
+
+                    });
+
+                });
+            });
+
+
+        });
+    </script>
+}
