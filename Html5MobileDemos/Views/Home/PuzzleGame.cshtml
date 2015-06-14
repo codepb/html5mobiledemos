@@ -50,9 +50,11 @@
                 mobileDemo.client.receiveConnection = function(id) {
                     if (playerOneId === "") {
                         playerOneId = id;
+                        $(".connected-players").text("1 player connected");
                     }
                     else if (playerTwoId === "") {
                         playerTwoId = id;
+                        $(".connected-players").text("2 players connected");
                     }
                 }
 
@@ -76,7 +78,8 @@
                 canvas,
                 canvasContext,
                 playerOneLevers = [],
-                playerTwoLevers = [];
+                playerTwoLevers = [],
+                    ball;
 
             var b2Vec2 = Box2D.Common.Math.b2Vec2;
             //var b2AABB = Box2D.Collision.b2AABB;
@@ -89,15 +92,7 @@
             var b2CircleShape = Box2D.Collision.Shapes.b2CircleShape;
             var b2DebugDraw = Box2D.Dynamics.b2DebugDraw;
 
-            function setUpCanvas() {
-                canvas = document.createElement("canvas");
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
-
-                $(".data").html($(canvas));
-
-                canvasContext = canvas.getContext("2d");
-            }
+            
 
             var Lever = function(box2dWorld, centerX, centerY, startingAngle) {
                 this.startingAngle = startingAngle;
@@ -114,21 +109,15 @@
                 this.body.SetAngle(startingAngle);
             }
 
-            Lever.prototype.SetAngle = function(angle) {
+            Lever.prototype.SetAngle = function (angle) {
                 this.body.SetAngle(angle + this.startingAngle);
             }
 
-            Lever.prototype.GetAngle = function() {
+            Lever.prototype.GetAngle = function () {
                 return this.body.GetAngle() - this.startingAngle;
             }
 
-            window.init = function() {
-
-
-                setUpCanvas();
-
-                world = new b2World(new b2Vec2(0, 10.0), false);
-
+            var Ball = function(box2dWorld, centerX, centerY) {
                 var fixDef = new b2FixtureDef;
                 fixDef.density = 1.0;
                 fixDef.friction = 0.5;
@@ -138,9 +127,46 @@
                 bodyDef.type = b2Body.b2_dynamicBody;
 
                 fixDef.shape = new b2CircleShape(10 / SCALE);
-                bodyDef.position.x = 100 / SCALE;
-                bodyDef.position.y = 100 / SCALE;
-                world.CreateBody(bodyDef).CreateFixture(fixDef);
+                bodyDef.position.x = centerX / SCALE;
+                bodyDef.position.y = centerY / SCALE;
+                var body = box2dWorld.CreateBody(bodyDef);
+                    body.CreateFixture(fixDef);
+                this.body = body;
+            }
+
+            function startGame() {
+                ball = new Ball(world, 100, 100);
+            }
+
+            function setUpCanvas() {
+                var $data = $(".data");
+                var $container = $("<div/>");
+                
+                $container.append($("<button/>").addClass("start-button").text("start").click(function () {
+                    startGame();
+                    $(this).attr('disabled', 'disabled');
+                }));
+                $container.append($("<span/>").addClass("connected-players"));
+                $data.html($container);
+                canvas = document.createElement("canvas");
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+
+                $data.append($(canvas));
+
+                canvasContext = canvas.getContext("2d");
+            }
+
+            
+
+            var init = function() {
+
+
+                setUpCanvas();
+
+                world = new b2World(new b2Vec2(0, 10.0), false);
+
+                
 
 
                 playerOneLevers.push(new Lever(world, 100, 200, 0));
@@ -164,6 +190,20 @@
                 world.SetDebugDraw(dDraw);
             }
 
+            function checkEndGame() {
+                if (typeof ball !== 'undefined' && ball.body.GetPosition().x * SCALE > CANVAS_WIDTH) {
+                    alert("you win");
+                    $(".start-button").removeAttr("disabled");
+                    return true;
+                    
+                } else if (typeof ball !== 'undefined' && (ball.body.GetPosition().y * SCALE > CANVAS_HEIGHT || ball.body.GetPosition().x < 0)) {
+                    alert("you lose");
+                    $(".start-button").removeAttr("disabled");
+                    return true;
+                }
+
+            }
+
 
             function draw() {
 
@@ -183,8 +223,13 @@
                 );
                 world.DrawDebugData();
                 world.ClearForces();
+                if (checkEndGame()) {
+                    world.DestroyBody(ball);
+                    ball = undefined;
+                }
 
                 window.requestAnimationFrame(update);
+                
             };
 
 
